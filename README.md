@@ -1,4 +1,4 @@
-# Bsw test task
+# IntexSoft test task
 
 ## Запуск по шагам:
 - Создайте `.env` файл по примеру файла `.env.example`
