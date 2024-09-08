@@ -1,0 +1,39 @@
+version: "3.8"
+services:
+  app:
+    build:
+      context: .
+    container_name: fastapi_test_app
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./.env
+    depends_on:
+      - db
+    command: ["make", "run"]
+
+  db:
+    image: postgres:16
+    container_name: db_test_task
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    env_file:
+      - ./.env
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
+#  neo4j:
+#    image: neo4j
+#    container_name: neo4j
+#    environment:
+#      - NEO4J_AUTH=neo4j/your_password
+#    ports:
+#      - "7474:7474"
+#      - "7687:7687"
+
+volumes:
+  postgres_data:
