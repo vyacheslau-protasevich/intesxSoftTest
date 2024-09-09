@@ -64,12 +64,7 @@ class Neo4jService:
         query = query.rstrip(", ")
         query += " RETURN u"
 
-        result = self.session.run(query, **query_params)
-        updated_user = result.single()
-
-        if updated_user:
-            return
-        raise UserDoesNotExistError(id=str(user_id))
+        self.session.run(query, **query_params)
 
     def get_user_by_id(self, user_id: uuid.UUID) -> UserOut:
         result = self.session.run(
@@ -98,11 +93,11 @@ class Neo4jService:
         return users
 
     def make_friends(self, user_id_1: uuid.UUID, user_id_2: uuid.UUID) -> None:
-        user_1 = self.get_user_by_id(user_id_1)
-        user_2 = self.get_user_by_id(user_id_2)
-
         if user_id_1 == user_id_2:
             raise CannotMakeFriendsWithSelfError
+
+        user_1 = self.get_user_by_id(user_id_1)
+        user_2 = self.get_user_by_id(user_id_2)
 
         friendship_exists = self.session.run(
             """

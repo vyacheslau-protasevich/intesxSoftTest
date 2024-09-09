@@ -82,7 +82,7 @@ def update_user(
     return Response(status_code=status.HTTP_200_OK)
 
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, )
 def delete_user(
         user_id: UUID,
         neo4j_service: Neo4jService = Depends(get_neo4j_sevice),
