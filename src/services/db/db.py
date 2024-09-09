@@ -1,11 +1,13 @@
 from neo4j import Session
 from models.user import UserIn, UserUpdateIn, UserOut
-from exceptions.user import UserDoesNotExistError, NoUpdateDataProvidedError, NoPathFoundError, UsersAreAlreadyFriendsError
+from exceptions.user import UserDoesNotExistError, NoUpdateDataProvidedError, NoPathFoundError, UsersAreAlreadyFriendsError, CannotMakeFriendsWithSelfError, ToManyFriendsToCreateError
 
 import uuid
 from datetime import datetime
+import itertools
+import random
 
-import logging
+import faker
 
 
 class Neo4jService:
@@ -75,9 +77,10 @@ class Neo4jService:
             MATCH (u:User {id: $id}) RETURN u
             """, id=str(user_id)
         )
-        if not result.single():
+        user = result.single()
+        if not user:
             raise UserDoesNotExistError(id=str(user_id))
-        user = dict(result.single()["u"].items())
+        user = dict(user["u"].items())
         user["created_at"] = user["created_at"].to_native()
         return UserOut(**user)
 
@@ -97,6 +100,9 @@ class Neo4jService:
     def make_friends(self, user_id_1: uuid.UUID, user_id_2: uuid.UUID) -> None:
         user_1 = self.get_user_by_id(user_id_1)
         user_2 = self.get_user_by_id(user_id_2)
+
+        if user_id_1 == user_id_2:
+            raise CannotMakeFriendsWithSelfError
 
         friendship_exists = self.session.run(
             """
@@ -148,3 +154,34 @@ class Neo4jService:
             return path_users[1:-1]
         else:
             raise NoPathFoundError(user_id_1=str(user_id_1), user_id_2=str(user_id_2))
+
+    def create_random_profiles(self, num_profiles: int, total_friends: int) -> None:
+        max_friends = num_profiles*(num_profiles-1)//2
+        if total_friends > max_friends:
+            raise ToManyFriendsToCreateError
+        fake = faker.Faker()
+        new_users = []
+        for _ in range(num_profiles):
+            phone_number_str = fake.phone_number()
+            phone_number_int = int(''.join(filter(str.isdigit, phone_number_str)))
+
+            zipcode_str = fake.zipcode()
+            zipcode_int = int(''.join(filter(str.isdigit, zipcode_str)))
+            user_data = UserIn(
+                first_name=fake.first_name(),
+                last_name=fake.last_name(),
+                phone=phone_number_int,
+                address=fake.street_address(),
+                city=fake.city(),
+                state=fake.state_abbr(),
+                zipcode=zipcode_int,
+                available=True,
+                profile_photo_url=None
+            )
+            user_id = self.create_user(user_data)
+            new_users.append(uuid.UUID(user_id["id"]))
+
+        unique_pairs = list(itertools.combinations(new_users, 2))
+        new_friend_pairs = random.sample(unique_pairs, total_friends)
+        for i in new_friend_pairs:
+            self.make_friends(user_id_1=i[0], user_id_2=i[1])
