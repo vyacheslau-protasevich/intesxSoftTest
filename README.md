@@ -6,12 +6,11 @@
 ```
 docker compose up --build
 ```
-- SwaggerUI будет доступен по адресу `http://127.0.0.1:3000/docs`
+- SwaggerUI будет доступен по адресу `http://127.0.0.1:8000/docs`
 
 ## Использованные технологии:
 - Python 3.11
 - FastAPI
 - Pydantic
-- PostgreSQL
-- SqlAlchhemy & Alembic
+- Neo4j
 - Docker
