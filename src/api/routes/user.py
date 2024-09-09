@@ -6,8 +6,7 @@ from services.db.db import Neo4jService
 from starlette import status
 
 from api.dependencies.db import get_neo4j_sevice
-from models.user import UserIn, UserOut, UserUpdate, UserUpdateIn
-
+from models.user import UserIn, UserUpdateIn
 
 router = APIRouter(
     tags=["Users"], prefix="/api/users"
@@ -93,5 +92,3 @@ def delete_user(
     except UserDoesNotExistError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
