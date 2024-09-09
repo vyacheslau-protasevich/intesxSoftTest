@@ -1,8 +1,11 @@
 from neo4j import Session
 from models.user import UserIn, UserUpdateIn, UserOut
-from exceptions.user import UserDoesNotExistError, NoUpdateDataProvidedError
+from exceptions.user import UserDoesNotExistError, NoUpdateDataProvidedError, NoPathFoundError, UsersAreAlreadyFriendsError
 
 import uuid
+from datetime import datetime
+
+import logging
 
 
 class Neo4jService:
@@ -11,13 +14,13 @@ class Neo4jService:
         self.session = session
 
     def create_user(self, user_data: UserIn):
-        """Create a new user based on the UserIn model."""
         user_id = str(uuid.uuid4())
         self.session.run(
                 """
                 CREATE (u:User {id: $id, first_name: $first_name, last_name: $last_name,
                                 phone: $phone, address: $address, city: $city, state: $state,
-                                zipcode: $zipcode, available: $available, profile_photo_url: $profile_photo_url})
+                                zipcode: $zipcode, available: $available, profile_photo_url: $profile_photo_url,
+                                created_at: $created_at})
                 """,
                 id=user_id,
                 first_name=user_data.first_name,
@@ -28,12 +31,12 @@ class Neo4jService:
                 state=user_data.state,
                 zipcode=user_data.zipcode,
                 available=user_data.available,
-                profile_photo_url=user_data.profile_photo_url
+                profile_photo_url=user_data.profile_photo_url,
+                created_at=datetime.utcnow()
             )
-        return {"id": user_id, "message": "User created successfully"}
+        return {"id": user_id}
 
-    def delete_user_by_id(self, user_id: uuid.UUID):
-        """Delete a user by their ID."""
+    def delete_user_by_id(self, user_id: uuid.UUID) -> None:
         user = self.get_user_by_id(user_id)
         self.session.run(
                 """
@@ -41,11 +44,9 @@ class Neo4jService:
                 """, id=str(user_id)
             )
 
-    def update_user_by_id(self, user_id: uuid.UUID, user_update: UserUpdateIn):
-        """Update user properties by their ID."""
+    def update_user_by_id(self, user_id: uuid.UUID, user_update: UserUpdateIn) -> None:
         user = self.get_user_by_id(user_id)
 
-        # Convert Pydantic model to a dictionary and filter out None values
         update_data = user_update.model_dump(exclude_unset=True, exclude_none=True)
 
         if not update_data:
@@ -54,59 +55,72 @@ class Neo4jService:
         query = "MATCH (u:User {id: $id}) SET "
         query_params = {"id": str(user_id)}
 
-        # Dynamically build the query based on the provided update data
         for key, value in update_data.items():
             query += f"u.{key} = ${key}, "
             query_params[key] = value
 
-        query = query.rstrip(", ")  # Remove trailing comma
+        query = query.rstrip(", ")
         query += " RETURN u"
 
-        # Execute the query
         result = self.session.run(query, **query_params)
         updated_user = result.single()
 
         if updated_user:
             return
-        raise UserDoesNotExistError
+        raise UserDoesNotExistError(id=str(user_id))
 
     def get_user_by_id(self, user_id: uuid.UUID) -> UserOut:
-        """Retrieve a user by their ID."""
         result = self.session.run(
             """
             MATCH (u:User {id: $id}) RETURN u
             """, id=str(user_id)
         )
-        user = result.single()
-        if user:
-            return UserOut(**user["u"], id=user_id)
-        else:
-            raise UserDoesNotExistError
+        if not result.single():
+            raise UserDoesNotExistError(id=str(user_id))
+        user = dict(result.single()["u"].items())
+        user["created_at"] = user["created_at"].to_native()
+        return UserOut(**user)
 
-    def get_all_users(self):
-        """Retrieve a list of all users."""
+    def get_all_users(self) -> list[UserOut]:
         result = self.session.run(
             """
             MATCH (u:User) RETURN u
             """
         )
-        users = [record["u"] for record in result]
-        return {"users": users}
+        users = []
+        for record in result:
+            user_data = dict(record["u"].items())
+            user_data["created_at"] = user_data["created_at"].to_native()
+            users.append(UserOut(**user_data))
+        return users
 
-    def make_friends(self, user_id_1: uuid.UUID, user_id_2: uuid.UUID):
-        """Create a friendship relationship between two users."""
+    def make_friends(self, user_id_1: uuid.UUID, user_id_2: uuid.UUID) -> None:
         user_1 = self.get_user_by_id(user_id_1)
         user_2 = self.get_user_by_id(user_id_2)
+
+        friendship_exists = self.session.run(
+            """
+            MATCH (u1:User {id: $user_id_1})-[:FRIEND]-(u2:User {id: $user_id_2})
+            RETURN u1
+            """,
+            user_id_1=str(user_id_1),
+            user_id_2=str(user_id_2)
+        ).single()
+
+        if friendship_exists:
+            raise UsersAreAlreadyFriendsError(user_id_1=str(user_id_1), user_id_2=str(user_id_2))
+
         self.session.run(
             """
             MATCH (u1:User {id: $user_id_1}), (u2:User {id: $user_id_2})
-            CREATE (u1)-[:FRIEND]->(u2), (u2)-[:FRIEND]->(u1)
-            """, user_id_1=str(user_id_1), user_id_2=str(user_id_2)
+            CREATE (u1)-[:FRIEND]->(u2)
+            CREATE (u2)-[:FRIEND]->(u1)
+            """,
+            user_id_1=str(user_id_1),
+            user_id_2=str(user_id_2)
         )
-        return {"message": f"User {user_id_1} and {user_id_2} are now friends"}
 
-    def get_friends(self, user_id: uuid.UUID):
-        """Retrieve all friends of a specific user."""
+    def get_friends(self, user_id: uuid.UUID) -> list[str]:
         user = self.get_user_by_id(user_id)
         result = self.session.run(
             """
@@ -114,11 +128,10 @@ class Neo4jService:
             RETURN friend
             """, id=str(user_id)
         )
-        friends = [record["friend"] for record in result]
-        return {"friends": friends}
+        friends = [record["friend"]["id"] for record in result]
+        return friends
 
-    def get_shortest_path(self, user_id_1: uuid.UUID, user_id_2: uuid.UUID):
-        """Find the shortest path between two users."""
+    def get_shortest_path(self, user_id_1: uuid.UUID, user_id_2: uuid.UUID) -> list[str]:
         user_1 = self.get_user_by_id(user_id_1)
         user_2 = self.get_user_by_id(user_id_2)
         result = self.session.run(
@@ -131,8 +144,7 @@ class Neo4jService:
 
         if path:
             user_nodes = path["p"].nodes
-            path_users = [{"id": node["id"], "first_name": node["first_name"], "last_name": node["last_name"]} for
-                          node in user_nodes]
-            return {"path": path_users}
+            path_users = [node["id"] for node in user_nodes]
+            return path_users[1:-1]
         else:
-            return {"error": "No path found between users"}
+            raise NoPathFoundError(user_id_1=str(user_id_1), user_id_2=str(user_id_2))
