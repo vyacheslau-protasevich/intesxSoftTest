@@ -10,7 +10,7 @@ class BaseUser(BaseModel):
     phone: int
     address: str
     city: str
-    state: str
+    state: str = Field(min_length=2, max_length=2)
     zipcode: int
     available: bool
 
