@@ -1,8 +1,8 @@
 from fastapi import FastAPI
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+from neo4j import Driver
 
-from api.dependencies.stubs import get_sessionmaker
+from api.dependencies.stubs import get_neo4j_driver
 
 
-def setup_dependencies(app: FastAPI, sessionmaker: async_sessionmaker[AsyncSession]) -> None:
-    app.dependency_overrides[get_sessionmaker] = lambda: sessionmaker
+def setup_dependencies(app: FastAPI, neo4j_driver: Driver) -> None:
+    app.dependency_overrides[get_neo4j_driver] = lambda: neo4j_driver
