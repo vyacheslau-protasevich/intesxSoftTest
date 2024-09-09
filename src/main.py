@@ -1,11 +1,10 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 # from api.dependencies import setup_dependencies
 from api.routes import setup_routes
 from api.dependencies import setup_dependencies
 from config import Settings
-from db.connection.session import get_async_engine, get_sessionmaker
+from db.driver import get_neo4j_driver
 
 
 def create_app() -> FastAPI:
@@ -16,22 +15,17 @@ def create_app() -> FastAPI:
     )
 
     config = Settings()
-    engine = get_async_engine(config.postgres_dsn)
-    sessionmaker = get_sessionmaker(engine)
+    neo4j_driver = get_neo4j_driver(
+        neo4j_uri=config.neo4j_uri,
+        username=config.neo4j_user,
+        password=config.neo4j_password
+    )
 
     setup_dependencies(
         app=app,
-        sessionmaker=sessionmaker
+        neo4j_driver=neo4j_driver
     )
     setup_routes(app)
-
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=config.allow_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"]
-    )
 
     return app
 
