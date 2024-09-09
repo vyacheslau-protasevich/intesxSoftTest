@@ -1,17 +1,14 @@
+from typing import Any, Generator
+
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+from neo4j import Driver
 
-from api.dependencies.stubs import get_sessionmaker
-from db.repositories import UserRepository, ProfilePhotoRepository
-from services.db.user import UserService
+from api.dependencies.stubs import get_neo4j_driver
+from services.db.db import Neo4jService
 
 
-async def get_user_service(
-    sessionmaker: async_sessionmaker[AsyncSession] = Depends(get_sessionmaker),
-):
-    async with sessionmaker() as session:
-        yield UserService(
-            session=session,
-            user_repository=UserRepository(session),
-            profile_photo_repository=ProfilePhotoRepository(session),
-        )
+def get_neo4j_sevice(
+    neo4j_driver: Driver = Depends(get_neo4j_driver)
+) -> Generator[Neo4jService, Any, None]:
+    with neo4j_driver.session() as session:
+        yield Neo4jService(session=session)
