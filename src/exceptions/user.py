@@ -8,3 +8,15 @@ class NoUpdateDataProvidedError(Exception):
 
     def __init__(self) -> None:
         super().__init__("No update data provided")
+
+
+class NoPathFoundError(Exception):
+
+    def __init__(self, user_id_1: str, user_id_2: str) -> None:
+        super().__init__(f"No path found between users with id='{user_id_1}' and id='{user_id_2}'")
+
+
+class UsersAreAlreadyFriendsError(Exception):
+
+    def __init__(self, user_id_1: str, user_id_2: str) -> None:
+        super().__init__(f"Users with id='{user_id_1}' and id='{user_id_2}' are already friends")
