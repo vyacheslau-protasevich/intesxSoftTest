@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from exceptions.user import UserDoesNotExistError, NoPathFoundError, UsersAreAlreadyFriendsError
+from exceptions.user import UserDoesNotExistError, NoPathFoundError, UsersAreAlreadyFriendsError, \
+    CannotMakeFriendsWithSelfError
 from fastapi import APIRouter, Depends, Form, Response, HTTPException
 from services.db.db import Neo4jService
 from starlette import status
@@ -8,13 +9,12 @@ from starlette import status
 from api.dependencies.db import get_neo4j_sevice
 from models.user import UserIn, UserOut, UserUpdate, UserUpdateIn
 
-
 router = APIRouter(
     tags=["Friends"], prefix="/api/friends"
 )
 
 
-@router.get("/all_friends", status_code=status.HTTP_200_OK)
+@router.get("/all_friends_of_{user_id}", status_code=status.HTTP_200_OK)
 def all_users_friends(
         user_id: UUID,
         neo4j_service: Neo4jService = Depends(get_neo4j_sevice),
@@ -25,7 +25,7 @@ def all_users_friends(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
-@router.post("/make_friends", status_code=status.HTTP_201_CREATED)
+@router.post("/friend{user_id_1}_with{user_id_2}", status_code=status.HTTP_201_CREATED)
 def make_friends(
         user_id_1: UUID,
         user_id_2: UUID,
@@ -38,9 +38,11 @@ def make_friends(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except UsersAreAlreadyFriendsError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except CannotMakeFriendsWithSelfError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.get("/shortest_path", status_code=status.HTTP_200_OK)
+@router.get("/shortest_path_from_{user_id_1}_to_{user_id_2}", status_code=status.HTTP_200_OK)
 def shortest_path(
         user_id_1: UUID,
         user_id_2: UUID,
@@ -52,4 +54,3 @@ def shortest_path(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except NoPathFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-
