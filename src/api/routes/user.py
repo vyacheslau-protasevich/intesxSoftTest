@@ -1,11 +1,12 @@
 from uuid import UUID
 
+from exceptions.user import UserDoesNotExistError
 from fastapi import APIRouter, Depends, Form, Response, HTTPException
+from services.db.db import Neo4jService
 from starlette import status
 
-from api.dependencies.db import get_user_service
+from api.dependencies.db import get_neo4j_sevice
 from models.user import UserIn, UserOut, UserUpdate, UserUpdateIn
-from services.db.user import UserService
 
 
 router = APIRouter(
@@ -14,27 +15,33 @@ router = APIRouter(
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_user(
+def create_user(
         user: UserIn,
-        user_service: UserService = Depends(get_user_service),
+        neo4j_service: Neo4jService = Depends(get_neo4j_sevice),
 ):
-    await user_service.create_user(user)
-    return {
-        "status": "User created"
-    }
+    return neo4j_service.create_user(user)
 
 
 @router.get("/{user_id}", status_code=status.HTTP_200_OK, summary="Get user by id")
-async def get_my_profile(
+def get_user_profile(
         user_id: UUID,
-        user_service: UserService = Depends(get_user_service),
+        neo4j_service: Neo4jService = Depends(get_neo4j_sevice),
 ):
-    user = await user_service.get_current_user(user_id)
-    return await user_service.get_user_by_id(user_id)
+    try:
+        return neo4j_service.get_user_by_id(user_id)
+    except UserDoesNotExistError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+
+@router.get("/all_users", status_code=status.HTTP_200_OK)
+def get_all_users(
+        neo4j_service: Neo4jService = Depends(get_neo4j_sevice),
+):
+    return neo4j_service.get_all_users()
 
 
 @router.put("/{user_id}", status_code=status.HTTP_202_ACCEPTED)
-async def update_user(
+def update_user(
         user_id: UUID,
         first_name: str | None = Form(None),
         last_name: str | None = Form(None),
@@ -44,7 +51,7 @@ async def update_user(
         state: str | None = Form(None),
         zipcode: int | None = Form(None),
         profile_photo: str | None = Form(None),
-        user_service: UserService = Depends(get_user_service),
+        neo4j_service: Neo4jService = Depends(get_neo4j_sevice),
 ):
     if phone:
         try:
@@ -57,7 +64,6 @@ async def update_user(
             zipcode = int(zipcode)
         except ValueError:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid zipcode format.")
-    user = await user_service.get_current_user(user_id)
     update_data = UserUpdateIn(
         first_name=first_name,
         last_name=last_name,
@@ -68,16 +74,20 @@ async def update_user(
         zipcode=zipcode,
         profile_photo=profile_photo
     )
-
-    await user_service.update_user(user_id, update_data)
+    try:
+        neo4j_service.update_user_by_id(user_id, update_data)
+    except UserDoesNotExistError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return Response(status_code=status.HTTP_200_OK)
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(
+def delete_user(
         user_id: UUID,
-        user_service: UserService = Depends(get_user_service),
+        neo4j_service: Neo4jService = Depends(get_neo4j_sevice),
 ):
-    user = await user_service.get_current_user(user_id)
-    await user_service.delete_user(user_id)
+    try:
+        neo4j_service.delete_user_by_id(user_id)
+    except UserDoesNotExistError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
