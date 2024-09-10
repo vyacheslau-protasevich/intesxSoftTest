@@ -13,3 +13,9 @@ docker-run:
 
 lint:
 	flake8 src/
+
+test:
+	pytest -s -v \
+	tests/api/test_users.py \
+	tests/api/test_random.py \
+	tests/api/test_friends.py \
