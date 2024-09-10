@@ -20,7 +20,7 @@ make test
 ```
 - Stop test db:
 ```
-make stpo-test-db
+make stop-test-db
 ```
 
 
