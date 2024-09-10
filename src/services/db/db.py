@@ -1,6 +1,8 @@
 from neo4j import Session
 from models.user import UserIn, UserUpdateIn, UserOut
-from exceptions.user import UserDoesNotExistError, NoUpdateDataProvidedError, NoPathFoundError, UsersAreAlreadyFriendsError, CannotMakeFriendsWithSelfError, ToManyFriendsToCreateError
+from exceptions.user import UserDoesNotExistError, NoUpdateDataProvidedError, \
+    NoPathFoundError, UsersAreAlreadyFriendsError, \
+    CannotMakeFriendsWithSelfError, ToManyFriendsToCreateError
 
 import uuid
 from datetime import datetime
@@ -18,38 +20,40 @@ class Neo4jService:
     def create_user(self, user_data: UserIn):
         user_id = str(uuid.uuid4())
         self.session.run(
-                """
-                CREATE (u:User {id: $id, first_name: $first_name, last_name: $last_name,
-                                phone: $phone, address: $address, city: $city, state: $state,
-                                zipcode: $zipcode, available: $available, profile_photo_url: $profile_photo_url,
-                                created_at: $created_at})
-                """,
-                id=user_id,
-                first_name=user_data.first_name,
-                last_name=user_data.last_name,
-                phone=user_data.phone,
-                address=user_data.address,
-                city=user_data.city,
-                state=user_data.state,
-                zipcode=user_data.zipcode,
-                available=user_data.available,
-                profile_photo_url=user_data.profile_photo_url,
-                created_at=datetime.utcnow()
-            )
+            """
+            CREATE (u:User {id: $id, first_name: $first_name, last_name: $last_name,
+                            phone: $phone, address: $address, city: $city, state: $state,
+                            zipcode: $zipcode, available: $available, profile_photo_url: $profile_photo_url,
+                            created_at: $created_at})
+            """,
+            id=user_id,
+            first_name=user_data.first_name,
+            last_name=user_data.last_name,
+            phone=user_data.phone,
+            address=user_data.address,
+            city=user_data.city,
+            state=user_data.state,
+            zipcode=user_data.zipcode,
+            available=user_data.available,
+            profile_photo_url=user_data.profile_photo_url,
+            created_at=datetime.utcnow()
+        )
         return {"id": user_id}
 
     def delete_user_by_id(self, user_id: uuid.UUID) -> None:
-        user = self.get_user_by_id(user_id)
+        user = self.get_user_by_id(user_id)  # noqa
         self.session.run(
-                """
-                MATCH (u:User {id: $id}) DETACH DELETE u
-                """, id=str(user_id)
-            )
+            """
+            MATCH (u:User {id: $id}) DETACH DELETE u
+            """, id=str(user_id)
+        )
 
-    def update_user_by_id(self, user_id: uuid.UUID, user_update: UserUpdateIn) -> None:
-        user = self.get_user_by_id(user_id)
+    def update_user_by_id(self, user_id: uuid.UUID,
+                          user_update: UserUpdateIn) -> None:
+        user = self.get_user_by_id(user_id)  # noqa
 
-        update_data = user_update.model_dump(exclude_unset=True, exclude_none=True)
+        update_data = user_update.model_dump(exclude_unset=True,
+                                             exclude_none=True)
 
         if not update_data:
             raise NoUpdateDataProvidedError
@@ -96,8 +100,8 @@ class Neo4jService:
         if user_id_1 == user_id_2:
             raise CannotMakeFriendsWithSelfError
 
-        user_1 = self.get_user_by_id(user_id_1)
-        user_2 = self.get_user_by_id(user_id_2)
+        user_1 = self.get_user_by_id(user_id_1)  # noqa
+        user_2 = self.get_user_by_id(user_id_2)  # noqa
 
         friendship_exists = self.session.run(
             """
@@ -109,7 +113,8 @@ class Neo4jService:
         ).single()
 
         if friendship_exists:
-            raise UsersAreAlreadyFriendsError(user_id_1=str(user_id_1), user_id_2=str(user_id_2))
+            raise UsersAreAlreadyFriendsError(user_id_1=str(user_id_1),
+                                              user_id_2=str(user_id_2))
 
         self.session.run(
             """
@@ -122,7 +127,7 @@ class Neo4jService:
         )
 
     def get_friends(self, user_id: uuid.UUID) -> list[str]:
-        user = self.get_user_by_id(user_id)
+        user = self.get_user_by_id(user_id)  # noqa
         result = self.session.run(
             """
             MATCH (u:User {id: $id})-[:FRIEND]->(friend)
@@ -132,9 +137,10 @@ class Neo4jService:
         friends = [record["friend"]["id"] for record in result]
         return friends
 
-    def get_shortest_path(self, user_id_1: uuid.UUID, user_id_2: uuid.UUID) -> list[str]:
-        user_1 = self.get_user_by_id(user_id_1)
-        user_2 = self.get_user_by_id(user_id_2)
+    def get_shortest_path(self, user_id_1: uuid.UUID, user_id_2: uuid.UUID) -> \
+            list[str]:
+        user_1 = self.get_user_by_id(user_id_1)  # noqa
+        user_2 = self.get_user_by_id(user_id_2)  # noqa
         result = self.session.run(
             """
             MATCH p=shortestPath((u1:User {id: $user_id_1})-[:FRIEND*]-(u2:User {id: $user_id_2}))
@@ -148,17 +154,20 @@ class Neo4jService:
             path_users = [node["id"] for node in user_nodes]
             return path_users[1:-1]
         else:
-            raise NoPathFoundError(user_id_1=str(user_id_1), user_id_2=str(user_id_2))
+            raise NoPathFoundError(user_id_1=str(user_id_1),
+                                   user_id_2=str(user_id_2))
 
-    def create_random_profiles(self, num_profiles: int, total_friends: int) -> None:
-        max_friends = num_profiles*(num_profiles-1)//2
+    def create_random_profiles(self, num_profiles: int,
+                               total_friends: int) -> None:
+        max_friends = num_profiles * (num_profiles - 1) // 2
         if total_friends > max_friends:
             raise ToManyFriendsToCreateError
         fake = faker.Faker()
         new_users = []
         for _ in range(num_profiles):
             phone_number_str = fake.phone_number()
-            phone_number_int = int(''.join(filter(str.isdigit, phone_number_str)))
+            phone_number_int = int(
+                ''.join(filter(str.isdigit, phone_number_str)))
 
             zipcode_str = fake.zipcode()
             zipcode_int = int(''.join(filter(str.isdigit, zipcode_str)))
