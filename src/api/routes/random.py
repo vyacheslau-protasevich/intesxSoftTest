@@ -11,6 +11,7 @@ router = APIRouter(
 
 
 @router.post("/random_{users}_users_{friends}_friends",
+             response_model=list[str],
              status_code=status.HTTP_200_OK)
 def create_random_users_and_make_friends(
         users: int,

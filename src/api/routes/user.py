@@ -6,14 +6,17 @@ from services.db.db import Neo4jService
 from starlette import status
 
 from api.dependencies.db import get_neo4j_service
-from models.user import UserIn, UserUpdateIn
+from models.user import UserIn, UserUpdateIn, UserOut
 
 router = APIRouter(
     tags=["Users"], prefix="/api/users"
 )
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post("",
+             response_model=dict[str, str],
+             status_code=status.HTTP_201_CREATED
+             )
 def create_user(
         user: UserIn,
         neo4j_service: Neo4jService = Depends(get_neo4j_service),
@@ -21,7 +24,10 @@ def create_user(
     return neo4j_service.create_user(user)
 
 
-@router.get("/all_users", status_code=status.HTTP_200_OK)
+@router.get("/all_users",
+            response_model=list[UserOut],
+            status_code=status.HTTP_200_OK,
+)
 def get_all_users(
         neo4j_service: Neo4jService = Depends(get_neo4j_service),
 ):
@@ -30,6 +36,7 @@ def get_all_users(
 
 @router.get(
     "/{user_id}",
+    response_model=UserOut,
     status_code=status.HTTP_200_OK,
     summary="Get user by id"
 )
