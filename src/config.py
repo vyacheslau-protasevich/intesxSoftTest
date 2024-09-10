@@ -14,7 +14,12 @@ class Settings(BaseSettings):
     neo4j_password: str
     neo4j_host: str
     neo4j_port: int
+    neo4j_test_port: int
 
     @property
     def neo4j_uri(self) -> str:
         return f"bolt://{self.neo4j_host}:{self.neo4j_port}"
+
+    @property
+    def neo4j_test_uri(self) -> str:
+        return f"bolt://{self.neo4j_host}:{self.neo4j_test_port}"
