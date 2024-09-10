@@ -9,10 +9,18 @@ docker-build:
 	docker compose build
 
 docker-run:
-	docker compose up
+	docker compose up --build
 
 lint:
 	flake8 src/
+
+run-test-db:
+	cd tests/docker && docker-compose up --build -d
+
+
+stop-test-db:
+	docker stop neo4j_db_test
+
 
 test:
 	pytest -s -v \
