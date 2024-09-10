@@ -1,13 +1,23 @@
 import asyncio
 import datetime
 import uuid
+from testcontainers.compose import DockerCompose
 
 from httpx import AsyncClient
 import pytest
 
 from src.config import Settings
 from src.main import app
-from neo4j import GraphDatabase
+
+from neo4j import GraphDatabase, Driver
+
+
+@pytest.fixture(scope="session")
+async def created_user_id(neo4j_driver: Driver) -> str:
+    with neo4j_driver.session() as session:
+        result = session.run("MATCH (u:User) RETURN u.id LIMIT 1")
+        a = result.single()["u.id"]
+        return str(a)
 
 
 @pytest.fixture(autouse=True, scope="session")
